@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 
 use axum::{body::Bytes, routing::{get, post}, Router, extract::State};
 use queues::*;
-use serde_json::Value;
+
 
 
 #[derive(Clone)]
@@ -19,7 +19,7 @@ async fn server_init(app: Router) {
     axum::serve(listener, app).await.unwrap();
 }
 
-pub async fn produce_handler(State(state): State<AppState>, request: axum::http::Request<axum::body::Body>) -> &'static str{
+pub async fn produce_handler(State(state): State<AppState>, request: axum::http::Request<axum::body::Body>) -> String{
     let body = request.into_body();
     let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
     let message = String::from_utf8(bytes.to_vec()).unwrap();
@@ -27,10 +27,15 @@ pub async fn produce_handler(State(state): State<AppState>, request: axum::http:
     let queue = state.queue.clone();
     let mut q = queue.write().unwrap();
     
-    q.add(bytes);
+    let result = q.add(bytes);
     println!("Body: {} ", message);
-    println!("Size of queue {}", q.size());
-    "Producer called"
+    match result {
+        Ok(_) => {
+            println!("Size of the queue: {}", q.size());
+            "Produced".to_string()
+        },
+        Err(e ) => e.to_string()
+    }
 }
 
 pub async fn consume_handler(State(state): State<AppState> ,request: axum::http::Request<axum::body::Body>) -> String {
@@ -48,7 +53,7 @@ pub async fn consume_handler(State(state): State<AppState> ,request: axum::http:
             let string_of_bytes = std::str::from_utf8(&value);
             match string_of_bytes {
                 Ok(val ) => val.to_string(),
-                Err(e) => "Error converting bytes to string".to_string()
+                Err(_)  => "Error converting bytes to string".to_string()
             }
         },
         Err(e) => e.to_string()
