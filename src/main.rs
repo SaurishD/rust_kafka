@@ -1,7 +1,9 @@
+use std::fmt::format;
+use std::fs::File;
 use std::usize;
 use std::sync::{Arc, RwLock};
 
-use axum::{body::Bytes, routing::{get, post}, Router, extract::State};
+use axum::{body::Bytes, routing::{get, post}, Router, extract::{State, Path}};
 use queues::*;
 
 
@@ -9,6 +11,17 @@ use queues::*;
 #[derive(Clone)]
 struct AppState{
     queue: Arc<std::sync::RwLock<queues::Queue<Bytes>>>,
+}
+
+struct DataProduceFormat {
+    topic: String,
+    data: Bytes
+}
+
+struct DataStorageFormat {
+    data: Bytes,
+    offset: u32, 
+    expiration_time: String,
 }
 
 
@@ -60,6 +73,16 @@ pub async fn consume_handler(State(state): State<AppState> ,request: axum::http:
     }
 }
 
+pub async fn create_topic(Path(topic_name):Path<String> ) -> String {
+    let file_path = format!("topics/{}.log", topic_name);
+    let file_created = File::create_new(file_path);
+    match file_created {
+        Ok(_) => "Topic successfully created".to_string(),
+        Err(e) => format!("Topic not created due to error: {}", e).to_string()
+    }
+ 
+}
+
 #[tokio::main]
 async fn main() {
     
@@ -69,6 +92,7 @@ async fn main() {
     let app: Router<()> = Router::new().route("/", get(|| async {"Hello, Rusty"}))
         .route("/produce", post(produce_handler))
         .route("/consume", post(consume_handler))
+        .route("/create_topic/{topic_name}", post(create_topic))
         .with_state(shared_state);
 
   server_init(app).await;
