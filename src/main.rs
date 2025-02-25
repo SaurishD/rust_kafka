@@ -1,7 +1,5 @@
-use std::f32::consts::E;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
-use std::path::PathBuf;
 use std::usize;
 use std::sync::{Arc, RwLock};
 
@@ -9,7 +7,7 @@ use axum::Json;
 use axum::{body::Bytes, routing::{get, post}, Router, extract::{State, Path}};
 use kv::{Bucket, Config, Store};
 use queues::*;
-use serde::{Deserialize};
+use serde::Deserialize;
 use serde_json::Value;
 
 
@@ -69,7 +67,7 @@ pub async fn produce_handler(State(state): State<AppState<'_>>, Json(payload): J
                     match written {
                         Ok(_) => {
                             let num =offset_str.parse::<u32>().expect("Error parsing offset number") + 1;
-                            let offset_update = state.bucket_directory.producer_bucket.set(&topic, &num.to_string()).expect("Error updating the offset in bucket");
+                            state.bucket_directory.producer_bucket.set(&topic, &num.to_string()).expect("Error updating the offset in bucket");
                             format!("Offset updated successfully!").to_string()
                         }
                         Err(e) => format!("Error updating offset {}", e).to_string()
