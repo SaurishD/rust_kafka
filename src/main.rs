@@ -1,39 +1,10 @@
-use std::fs::{File, OpenOptions};
-use std::io::Write;
-use std::usize;
+use std::fs::File;
 use std::sync::{Arc, RwLock};
-
-use axum::Json;
-use axum::{body::Bytes, routing::{get, post}, Router, extract::{State, Path}};
-use kv::{Bucket, Config, Store};
+use axum::{ routing::{get, post}, Router, extract::{State, Path}};
+use kv::{ Config, Store};
 use queues::*;
-use serde::Deserialize;
-use serde_json::Value;
-
-
-#[derive(Clone)]
-pub struct BucketDirectory <'a> {
-    producer_bucket: Bucket<'a, String,String>,
-    consumer_bucket: Bucket<'a, String,String>
-}
-
-
-#[derive(Clone)]
-pub struct AppState<'a>{
-    queue: Arc<std::sync::RwLock<queues::Queue<Bytes>>>,
-    bucket_directory: BucketDirectory<'a>
-}
-
-#[derive(Deserialize)]
-pub struct DataProduceFormat {
-    topic: String,
-    data: Value
-}
-#[derive(serde::Serialize)]
-struct DataStorageFormat {
-    data: Value,
-    offset: u32, 
-}
+use kafka::models::{BucketDirectory, AppState};
+use kafka::handlers::{producer::produce_handler, consumer::consume_handler};
 
 
 
@@ -44,68 +15,7 @@ async fn server_init(app: Router) {
     axum::serve(listener, app).await.unwrap();
 }
 
-pub async fn produce_handler(State(state): State<AppState<'_>>, Json(payload): Json<DataProduceFormat>) -> String{
-    let topic = payload.topic;
-    let message = payload.data;
-    
-    
-    
-    let file_path = format!("topics/{}.log",topic);
-    let open_file = OpenOptions::new().append(true).open(file_path);
-    match open_file{
-        Ok(mut f) => {
-            let offset = state.bucket_directory.producer_bucket.get(&topic);
-            match offset{
-                Ok(Some(offset_str)) => {
-                    let offset_num = offset_str.parse::<u32>().expect("Error parsing offset number");
-                    let data_to_store = DataStorageFormat {
-                        data: message,
-                        offset: offset_num
-                    };
-                    //let bytes = Bytes::from(log);
-                    let data_string = serde_json::to_string_pretty(&data_to_store).expect("Error stringify object");
 
-                    let written= writeln!(f, "{}", data_string);
-                    match written {
-                        Ok(_) => {
-                            let num =offset_str.parse::<u32>().expect("Error parsing offset number") + 1;
-                            state.bucket_directory.producer_bucket.set(&topic, &num.to_string()).expect("Error updating the offset in bucket");
-                            format!("Offset updated successfully!").to_string()
-                        }
-                        Err(e) => format!("Error updating offset {}", e).to_string()
-                    }
-                    
-                }Ok(None) => format!("Topic not initialized"),
-                Err(e) => {
-                    return format!("Error fetching topic offset: {}", e);
-                }
-            }
-        }Err(e) => format!("Cannot open log file for topic: {}", e).to_string()
-        
-    }
-}
-
-pub async fn consume_handler(State(state): State<AppState<'_>> ,request: axum::http::Request<axum::body::Body>) -> String {
-    let body = request.into_body();
-    let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
-    let message = String::from_utf8(bytes.to_vec()).unwrap();
-    let queue = state.queue.clone();
-    let mut q = queue.write().unwrap();
-    let extract_bytes = q.remove();
-
-    println!("Consumer Body: {}",message);
-    
-    match extract_bytes {
-        Ok(value) => {
-            let string_of_bytes = std::str::from_utf8(&value);
-            match string_of_bytes {
-                Ok(val ) => val.to_string(),
-                Err(_)  => "Error converting bytes to string".to_string()
-            }
-        },
-        Err(e) => e.to_string()
-    }
-}
 
 pub async fn create_topic(State(state): State<AppState<'_>> ,Path(topic_name):Path<String> ) -> String {
     let file_path = format!("topics/{}.log", topic_name);
