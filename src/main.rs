@@ -12,28 +12,27 @@ use serde_json::Value;
 
 
 #[derive(Clone)]
-struct BucketDirectory <'a> {
+pub struct BucketDirectory <'a> {
     producer_bucket: Bucket<'a, String,String>,
     consumer_bucket: Bucket<'a, String,String>
 }
 
 
 #[derive(Clone)]
-struct AppState<'a>{
+pub struct AppState<'a>{
     queue: Arc<std::sync::RwLock<queues::Queue<Bytes>>>,
     bucket_directory: BucketDirectory<'a>
 }
 
 #[derive(Deserialize)]
-struct DataProduceFormat {
+pub struct DataProduceFormat {
     topic: String,
     data: Value
 }
-
+#[derive(serde::Serialize)]
 struct DataStorageFormat {
-    data: Bytes,
+    data: Value,
     offset: u32, 
-    expiration_time: String,
 }
 
 
@@ -58,12 +57,15 @@ pub async fn produce_handler(State(state): State<AppState<'_>>, Json(payload): J
             let offset = state.bucket_directory.producer_bucket.get(&topic);
             match offset{
                 Ok(Some(offset_str)) => {
-                  
-                    
-                    let log = format!("{} {}",offset_str,message);
+                    let offset_num = offset_str.parse::<u32>().expect("Error parsing offset number");
+                    let data_to_store = DataStorageFormat {
+                        data: message,
+                        offset: offset_num
+                    };
                     //let bytes = Bytes::from(log);
+                    let data_string = serde_json::to_string_pretty(&data_to_store).expect("Error stringify object");
 
-                    let written= writeln!(f, "{}", log);
+                    let written= writeln!(f, "{}", data_string);
                     match written {
                         Ok(_) => {
                             let num =offset_str.parse::<u32>().expect("Error parsing offset number") + 1;
