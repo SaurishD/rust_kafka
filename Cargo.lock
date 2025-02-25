@@ -316,20 +316,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d75a2a4b1b190afb6f5425f10f6a8f959d2ea0b9c2b1d79553551850539e4674"
 
 [[package]]
-name = "kafka"
-version = "0.1.0"
-dependencies = [
- "axum",
- "bytes",
- "kv",
- "queues",
- "serde",
- "serde_json",
- "tokio",
- "tower",
-]
-
-[[package]]
 name = "kv"
 version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -523,6 +509,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "03a862b389f93e68874fbf580b9de08dd02facb9a788ebadaf4a3fd33cf58834"
 dependencies = [
  "bitflags 2.8.0",
+]
+
+[[package]]
+name = "rust_kafka"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "bytes",
+ "kv",
+ "queues",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
 ]
 
 [[package]]
