@@ -3,7 +3,7 @@ use axum::{ routing::{get, post}, Router};
 use kv::{ Config, Store};
 use queues::*;
 use rust_kafka::models::{BucketDirectory, AppState};
-use rust_kafka::handlers::{producer::produce_handler, consumer::consume_handler, topic::create_topic};
+use rust_kafka::handlers::{producer::produce_handler, consumer::consume_handler, topic::{create_topic,subscribe_topic}};
 
 
 
@@ -20,11 +20,10 @@ pub fn init_store() -> Result<BucketDirectory<'static>, kv::Error> {
     let offset_store = Store::new(offset_config)?;
 
     let producer_bucket = offset_store.bucket::<String,String>(Some("ProducerBucket"))?;
-    let consumer_bucket = offset_store.bucket::<String,String>(Some("ConsumerBucker"))?;
 
     Ok( BucketDirectory {
         producer_bucket: producer_bucket,
-        consumer_bucket: consumer_bucket
+        offset_store: offset_store
     })
 }
 
@@ -55,6 +54,7 @@ async fn main() {
         .route("/produce", post(produce_handler))
         .route("/consume", post(consume_handler))
         .route("/create_topic/{topic_name}", post(create_topic))
+        .route("/subscribe", post(subscribe_topic))
         .with_state(shared_state);
 
   server_init(app).await;
