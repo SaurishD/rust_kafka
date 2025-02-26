@@ -1,28 +1,10 @@
-use std::fmt::format;
-use std::fs::File;
-use std::usize;
 use std::sync::{Arc, RwLock};
-
-use axum::{body::Bytes, routing::{get, post}, Router, extract::{State, Path}};
+use axum::{ routing::{get, post}, Router};
+use kv::{ Config, Store};
 use queues::*;
+use rust_kafka::models::{BucketDirectory, AppState};
+use rust_kafka::handlers::{producer::produce_handler, consumer::consume_handler, topic::create_topic};
 
-
-
-#[derive(Clone)]
-struct AppState{
-    queue: Arc<std::sync::RwLock<queues::Queue<Bytes>>>,
-}
-
-struct DataProduceFormat {
-    topic: String,
-    data: Bytes
-}
-
-struct DataStorageFormat {
-    data: Bytes,
-    offset: u32, 
-    expiration_time: String,
-}
 
 
 
@@ -32,63 +14,43 @@ async fn server_init(app: Router) {
     axum::serve(listener, app).await.unwrap();
 }
 
-pub async fn produce_handler(State(state): State<AppState>, request: axum::http::Request<axum::body::Body>) -> String{
-    let body = request.into_body();
-    let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
-    let message = String::from_utf8(bytes.to_vec()).unwrap();
-    
-    let queue = state.queue.clone();
-    let mut q = queue.write().unwrap();
-    
-    let result = q.add(bytes);
-    println!("Body: {} ", message);
-    match result {
-        Ok(_) => {
-            println!("Size of the queue: {}", q.size());
-            "Produced".to_string()
-        },
-        Err(e ) => e.to_string()
-    }
-}
 
-pub async fn consume_handler(State(state): State<AppState> ,request: axum::http::Request<axum::body::Body>) -> String {
-    let body = request.into_body();
-    let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
-    let message = String::from_utf8(bytes.to_vec()).unwrap();
-    let queue = state.queue.clone();
-    let mut q = queue.write().unwrap();
-    let extract_bytes = q.remove();
+pub fn init_store() -> Result<BucketDirectory<'static>, kv::Error> {
+    let offset_config = Config::new("./offsets").flush_every_ms(500);
+    let offset_store = Store::new(offset_config)?;
 
-    println!("Consumer Body: {}",message);
-    
-    match extract_bytes {
-        Ok(value) => {
-            let string_of_bytes = std::str::from_utf8(&value);
-            match string_of_bytes {
-                Ok(val ) => val.to_string(),
-                Err(_)  => "Error converting bytes to string".to_string()
-            }
-        },
-        Err(e) => e.to_string()
-    }
-}
+    let producer_bucket = offset_store.bucket::<String,String>(Some("ProducerBucket"))?;
+    let consumer_bucket = offset_store.bucket::<String,String>(Some("ConsumerBucker"))?;
 
-pub async fn create_topic(Path(topic_name):Path<String> ) -> String {
-    let file_path = format!("topics/{}.log", topic_name);
-    let file_created = File::create_new(file_path);
-    match file_created {
-        Ok(_) => "Topic successfully created".to_string(),
-        Err(e) => format!("Topic not created due to error: {}", e).to_string()
-    }
- 
+    Ok( BucketDirectory {
+        producer_bucket: producer_bucket,
+        consumer_bucket: consumer_bucket
+    })
 }
 
 #[tokio::main]
 async fn main() {
     
+    
+
+    let bucket_directory: BucketDirectory;
+
+    let extract_directory = init_store();
+    match extract_directory {
+        Ok(str) => {
+            bucket_directory = str;
+        }Err(e) => {
+            println!("Something went wrong: {}", e);
+            return;
+        }
+    }
+
     let shared_state = AppState {
-        queue: Arc::new(RwLock::new(queue![]))
+        queue: Arc::new(RwLock::new(queue![])),
+        bucket_directory: bucket_directory
     };
+    
+    
     let app: Router<()> = Router::new().route("/", get(|| async {"Hello, Rusty"}))
         .route("/produce", post(produce_handler))
         .route("/consume", post(consume_handler))
@@ -98,3 +60,5 @@ async fn main() {
   server_init(app).await;
     
 }
+
+
