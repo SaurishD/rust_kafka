@@ -6,7 +6,6 @@ use axum::extract::State;
 use crate::models::{AppState, DataProduceFormat, DataStorageFormat};
 
 
-
 pub async fn produce_handler(State(state): State<AppState<'_>>, Json(payload): Json<DataProduceFormat>) -> String{
     let topic = payload.topic;
     let message = payload.data;
@@ -25,7 +24,7 @@ pub async fn produce_handler(State(state): State<AppState<'_>>, Json(payload): J
                 offset: offset_num
             };
             //let bytes = Bytes::from(log);
-            let data_string = serde_json::to_string_pretty(&data_to_store).expect("Error stringify object");
+            let data_string = serde_json::to_string(&data_to_store).expect("Error stringify object");
 
             let written= writeln!(f, "{}", data_string);
             match written {

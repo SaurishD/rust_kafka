@@ -22,7 +22,7 @@ pub struct DataProduceFormat {
     pub topic: String,
     pub data: Value
 }
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize,Deserialize)]
 pub struct DataStorageFormat {
     pub data: Value,
     pub offset: u32, 

@@ -19,8 +19,8 @@ pub fn init_store() -> Result<BucketDirectory<'static>, kv::Error> {
     let offset_config = Config::new("./offsets").flush_every_ms(500);
     let offset_store = Store::new(offset_config)?;
 
-    let consumer_bucket = offset_store.bucket::<String,String>(Some("ProducerBucket"))?;
-    let producer_bucket = offset_store.bucket::<String,String>(Some("ConsumerBucker"))?;
+    let producer_bucket = offset_store.bucket::<String,String>(Some("ProducerBucket"))?;
+    let consumer_bucket = offset_store.bucket::<String,String>(Some("ConsumerBucker"))?;
 
     Ok( BucketDirectory {
         producer_bucket: producer_bucket,
