@@ -2,17 +2,14 @@ use std::fs::File;
 use std::io::{self, BufRead};
 
 use axum::{extract::State, Json};
-use serde::Deserialize;
-use crate::models::{AppState, DataStorageFormat};
+use crate::models::{AppState, DataStorageFormat,ConsumerRequest};
 use crate::utils::get_file_path;
-#[derive(Deserialize)]
-pub struct Topic {
-    topic: String,
-}
 
-pub async fn consume_handler(State(state): State<AppState<'_>> ,Json(body) : Json<Topic> ) -> String {
+pub async fn consume_handler(State(state): State<AppState<'_>> ,Json(body) : Json<ConsumerRequest> ) -> String {
     let topic = body.topic;
-    let offset = state.bucket_directory.consumer_bucket.get(&topic);
+    let group_id = body.group_id;
+    let consumer_group_bucket = state.bucket_directory.offset_store.bucket::<String,String>(Some(&group_id)).expect("Error getting group_id bucket");
+    let offset = consumer_group_bucket.get(&topic);
     match offset {
         Ok(Some(offs)) => {
 
@@ -28,7 +25,7 @@ pub async fn consume_handler(State(state): State<AppState<'_>> ,Json(body) : Jso
                 let data_storage: DataStorageFormat = serde_json::from_str(&line).expect("Error decoding line"); 
                 if data_storage.offset == offset_num {
                     let next_offs = (offset_num+1).to_string();
-                    state.bucket_directory.consumer_bucket.set(&topic, &next_offs).expect("Error updating the offset");
+                    consumer_group_bucket.set(&topic, &next_offs).expect("Error updating the offset");
                     return data_storage.data.to_string();
                 }
             }
