@@ -1,15 +1,9 @@
-use axum::{
-    routing::{get, post},
-    Router,
-};
+use axum::Router;
 use kv::{Config, Store};
 use queues::*;
-use rust_kafka::handlers::{
-    consumer::consume_handler,
-    producer::produce_handler,
-    topic::{create_topic, subscribe_topic},
-};
 use rust_kafka::models::{AppState, BucketDirectory};
+use rust_kafka::routes::producer_routes::producer_routes;
+use rust_kafka::routes::{consumer_routes::consumer_routes, topic_routes::topic_routes};
 use std::sync::{Arc, RwLock};
 
 async fn server_init(app: Router) {
@@ -18,7 +12,7 @@ async fn server_init(app: Router) {
     axum::serve(listener, app).await.unwrap();
 }
 
-pub fn init_store() -> Result<BucketDirectory<'static>, kv::Error> {
+pub fn init_store() -> Result<BucketDirectory, kv::Error> {
     let offset_config = Config::new("./offsets").flush_every_ms(500);
     let offset_store = Store::new(offset_config)?;
 
@@ -49,14 +43,13 @@ async fn main() {
         queue: Arc::new(RwLock::new(queue![])),
         bucket_directory: bucket_directory,
     };
-
-    let app: Router<()> = Router::new()
-        .route("/", get(|| async { "Hello, Rusty" }))
-        .route("/produce", post(produce_handler))
-        .route("/consume", post(consume_handler))
-        .route("/create_topic/{topic_name}", post(create_topic))
-        .route("/subscribe", post(subscribe_topic))
+    let app: Router<()> = Router::<AppState>::new()
+        .merge(producer_routes())
+        .merge(consumer_routes())
+        .merge(topic_routes())
         .with_state(shared_state);
+
+    // let app = Router::new().merge(producer_routes());
 
     server_init(app).await;
 }

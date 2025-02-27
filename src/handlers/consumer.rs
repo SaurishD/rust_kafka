@@ -6,7 +6,7 @@ use crate::utils::get_file_path;
 use axum::{extract::State, Json};
 
 pub async fn consume_handler(
-    State(state): State<AppState<'_>>,
+    State(state): State<AppState>,
     Json(body): Json<ConsumerRequest>,
 ) -> String {
     let topic = body.topic;
@@ -45,5 +45,23 @@ pub async fn consume_handler(
         }
         Ok(None) => format!("Consumer offset not initialised for toptic {}", topic).to_string(),
         Err(e) => format!("Error getting consumer offset for topic: {}", e).to_string(),
+    }
+}
+
+pub async fn subscribe_topic(
+    State(state): State<AppState>,
+    Json(body): Json<ConsumerRequest>,
+) -> String {
+    let group_id = body.group_id;
+    let topic_name = body.topic;
+    let consumer_bucket = state
+        .bucket_directory
+        .offset_store
+        .bucket::<String, String>(Some(&group_id))
+        .expect("Error creating consumer bucket");
+    let consumer_offset_initialised = consumer_bucket.set(&topic_name, &"0".to_string());
+    match consumer_offset_initialised {
+        Ok(_) => "Topic created successfully".to_string(),
+        Err(e) => format!("Error initialising consumer offset {}", e).to_string(),
     }
 }

@@ -6,7 +6,7 @@ use std::io::Write;
 use crate::models::{AppState, DataProduceFormat, DataStorageFormat};
 
 pub async fn produce_handler(
-    State(state): State<AppState<'_>>,
+    State(state): State<AppState>,
     Json(payload): Json<DataProduceFormat>,
 ) -> String {
     let topic = payload.topic;
