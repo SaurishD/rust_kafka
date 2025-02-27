@@ -5,15 +5,15 @@ use serde_json::Value;
 use std::sync::Arc;
 
 #[derive(Clone)]
-pub struct BucketDirectory<'a> {
-    pub producer_bucket: Bucket<'a, String, String>,
+pub struct BucketDirectory {
+    pub producer_bucket: Bucket<'static, String, String>,
     pub offset_store: Store,
 }
 
 #[derive(Clone)]
-pub struct AppState<'a> {
+pub struct AppState {
     pub queue: Arc<std::sync::RwLock<queues::Queue<Bytes>>>,
-    pub bucket_directory: BucketDirectory<'a>,
+    pub bucket_directory: BucketDirectory,
 }
 
 #[derive(Deserialize)]
