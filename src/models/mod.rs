@@ -10,8 +10,8 @@ use std::sync::Arc;
 pub struct Topic {
     pub name: String,
     pub partition_number: u8,
-    pub retaintion_time: u32,
-    pub max_size: u32,
+    pub retaintion_time: u128,
+    pub max_size: u64,
 }
 
 impl Kv_Value for Topic {
