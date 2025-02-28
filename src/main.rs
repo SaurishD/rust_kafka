@@ -1,7 +1,7 @@
 use axum::Router;
 use kv::{Config, Store};
 use queues::*;
-use rust_kafka::models::{AppState, BucketDirectory};
+use rust_kafka::models::{AppState, BucketDirectory, Topic};
 use rust_kafka::routes::producer_routes::producer_routes;
 use rust_kafka::routes::{consumer_routes::consumer_routes, topic_routes::topic_routes};
 use std::sync::{Arc, RwLock};
@@ -38,10 +38,18 @@ async fn main() {
             return;
         }
     }
+    let metadata_store_config = Config::new("./metadata").flush_every_ms(500);
+    let metadata_store =
+        Store::new(metadata_store_config).expect("topic metadata store not initialized");
+
+    let topic_metata_bucket = metadata_store
+        .bucket::<String, Topic>(Some("TopicMetadata"))
+        .expect("topic metadata bucket not initialized");
 
     let shared_state = AppState {
         queue: Arc::new(RwLock::new(queue![])),
         bucket_directory: bucket_directory,
+        topic_metadata: topic_metata_bucket,
     };
     let app: Router<()> = Router::<AppState>::new()
         .merge(producer_routes())
